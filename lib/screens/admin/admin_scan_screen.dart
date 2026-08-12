@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/admin_provider.dart';
+import '../../widgets/vehicle_number_plate_field.dart';
 import 'admin_booking_detail_screen.dart';
 
 class AdminScanScreen extends StatefulWidget {
@@ -405,55 +406,42 @@ class _AdminScanScreenState extends State<AdminScanScreen>
 
                     const SizedBox(height: 12),
 
-                    // Manual entry
-                    Row(
+                    // Manual vehicle plate entry
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _manualCtrl,
-                            style:
-                                const TextStyle(color: AppColors.textPrimary),
-                            decoration: InputDecoration(
-                              hintText: 'Enter Vehicle No. (e.g. MH12AB1234) or ID...',
-                              hintStyle: const TextStyle(
-                                  color: AppColors.textMuted, fontSize: 13),
-                              filled: true,
-                              fillColor: AppColors.bgCard,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: AppColors.border),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: AppColors.border),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                    color: AppColors.primary, width: 1.5),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 12),
-                              prefixIcon: const Icon(Icons.search_rounded,
-                                  color: AppColors.textMuted, size: 18),
-                            ),
+                        const Text(
+                          'Manual Vehicle Lookup',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: _manualLookup,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
+                        const SizedBox(height: 8),
+                        VehicleNumberPlateField(
+                          controller: _manualCtrl,
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _manualLookup,
+                            icon: const Icon(Icons.search_rounded, size: 18),
+                            label: const Text(
+                              'Search Booking by Vehicle No. / ID',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                           ),
-                          child: const Text('Find',
-                              style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ),

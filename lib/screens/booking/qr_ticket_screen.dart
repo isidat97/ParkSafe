@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_theme.dart';
@@ -8,8 +11,61 @@ import '../../core/utils/app_helpers.dart';
 import '../../providers/booking_provider.dart';
 import '../../widgets/common_widgets.dart';
 
-class QrTicketScreen extends StatelessWidget {
+class QrTicketScreen extends StatefulWidget {
   const QrTicketScreen({super.key});
+
+  @override
+  State<QrTicketScreen> createState() => _QrTicketScreenState();
+}
+
+class _QrTicketScreenState extends State<QrTicketScreen> {
+  final GlobalKey _ticketKey = GlobalKey();
+  bool _isDownloading = false;
+
+  Future<void> _downloadTicketToGallery() async {
+    setState(() => _isDownloading = true);
+    try {
+      final boundary =
+          _ticketKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw Exception('Unable to capture ticket image');
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngBytes = byteData?.buffer.asUint8List();
+
+      if (pngBytes == null) {
+        throw Exception('Failed to generate image bytes');
+      }
+
+      // Save directly to native device photo gallery using gal
+      await Gal.putImageBytes(pngBytes, album: 'ParkSafe Tickets');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Ticket downloaded & saved to Gallery!'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save ticket: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +82,8 @@ class QrTicketScreen extends StatelessWidget {
       qrDecoded = jsonDecode(b.qrCodeData ?? '{}') as Map<String, dynamic>;
     } catch (_) {}
 
-    final bookingRef = qrDecoded?['booking_ref'] as String? ?? b.id.substring(0, 8).toUpperCase();
+    final bookingRef = qrDecoded?['booking_ref'] as String? ??
+        b.id.substring(0, 8).toUpperCase();
 
     return Scaffold(
       body: Container(
@@ -92,221 +149,211 @@ class QrTicketScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
 
-                      // Ticket card
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppColors.border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.1),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            // Ticket header
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: const BoxDecoration(
-                                gradient: AppColors.primaryGradient,
-                                borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(24)),
+                      // Ticket card wrapped in RepaintBoundary for Gallery Download
+                      RepaintBoundary(
+                        key: _ticketKey,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.bgCard,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: AppColors.border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.1),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.local_parking_rounded,
-                                      color: Colors.white, size: 28),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'ParkSafe',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Parking Ticket',
-                                          style: TextStyle(
-                                            color: Colors.white.withOpacity(0.8),
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      const Text(
-                                        'Ref No.',
-                                        style: TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                      Text(
-                                        bookingRef,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Dashed separator
-                            _DashedDivider(),
-
-                            // QR code
-                            Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: QrImageView(
-                                      data: b.qrCodeData ?? b.id,
-                                      version: QrVersions.auto,
-                                      size: 200,
-                                      backgroundColor: Colors.white,
-                                      eyeStyle: const QrEyeStyle(
-                                        eyeShape: QrEyeShape.square,
-                                        color: Color(0xFF0A0E1A),
-                                      ),
-                                      dataModuleStyle: const QrDataModuleStyle(
-                                        dataModuleShape:
-                                            QrDataModuleShape.square,
-                                        color: Color(0xFF0A0E1A),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  if (b.paymentId?.startsWith('FT-') ?? false) ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFF6D00).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                            color: const Color(0xFFFF6D00).withOpacity(0.5)),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              // Ticket header
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: const BoxDecoration(
+                                  gradient: AppColors.primaryGradient,
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(24)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.local_parking_rounded,
+                                        color: Colors.white, size: 28),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Icon(Icons.nfc_rounded,
-                                              color: Color(0xFFFF6D00), size: 16),
-                                          SizedBox(width: 6),
-                                          Text(
-                                            'NETC FASTag Auto-Scan Enabled',
+                                          const Text(
+                                            'ParkSafe',
                                             style: TextStyle(
-                                              color: Color(0xFFFF6D00),
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Parking Ticket',
+                                            style: TextStyle(
+                                              color:
+                                                  Colors.white.withOpacity(0.8),
+                                              fontSize: 12,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
-                                    const Text(
-                                      'Windshield FASTag will auto-scan at parking gate barrier',
-                                      style: TextStyle(
-                                        color: AppColors.textMuted,
-                                        fontSize: 11,
-                                      ),
-                                      textAlign: TextAlign.center,
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        const Text(
+                                          'REF',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                        Text(
+                                          bookingRef,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ] else
-                                    const Text(
-                                      'Scan QR code at parking gate',
-                                      style: TextStyle(
-                                        color: AppColors.textMuted,
-                                        fontSize: 12,
+                                  ],
+                                ),
+                              ),
+
+                              // Ticket body
+                              Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  children: [
+                                    // QR Code Container
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border:
+                                            Border.all(color: AppColors.border),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x0A000000),
+                                            blurRadius: 10,
+                                            offset: Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          QrImageView(
+                                            data: b.qrCodeData ?? b.id,
+                                            version: QrVersions.auto,
+                                            size: 180,
+                                            backgroundColor: Colors.white,
+                                            eyeStyle: const QrEyeStyle(
+                                              eyeShape: QrEyeShape.square,
+                                              color: Color(0xFF0F172A),
+                                            ),
+                                            dataModuleStyle:
+                                                const QrDataModuleStyle(
+                                              dataModuleShape:
+                                                  QrDataModuleShape.square,
+                                              color: Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Scan at entrance/exit gate',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                ],
-                              ),
-                            ),
+                                    const SizedBox(height: 24),
 
-                            // Dashed separator
-                            _DashedDivider(),
+                                    // Dashed separator
+                                    _DashedDivider(),
+                                    const SizedBox(height: 24),
 
-                            // Details
-                            Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                children: [
-                                  _TicketRow(
-                                    label: 'Slot',
-                                    value: b.slot?.slotNumber ?? '-',
-                                  ),
-                                  _TicketRow(
-                                    label: 'Vehicle',
-                                    value: b.vehicleNumber,
-                                  ),
-                                  _TicketRow(
-                                    label: 'Date',
-                                    value: b.bookingDate,
-                                  ),
-                                  _TicketRow(
-                                    label: 'Time',
-                                    value:
-                                        '${AppHelpers.formatTime(b.startTime)} – ${AppHelpers.formatTime(b.endTime)}',
-                                  ),
-                                  _TicketRow(
-                                    label: 'Duration',
-                                    value:
-                                        '${b.totalHours.toStringAsFixed(1)} hours',
-                                  ),
-                                  _TicketRow(
-                                    label: 'Payment Method',
-                                    value: (b.paymentId?.startsWith('FT-') ?? false)
-                                        ? 'NETC FASTag (RFID)'
-                                        : 'Online Payment',
-                                    valueColor: (b.paymentId?.startsWith('FT-') ?? false)
-                                        ? const Color(0xFFFF6D00)
-                                        : AppColors.textPrimary,
-                                  ),
-                                  const Divider(color: AppColors.border),
-                                  _TicketRow(
-                                    label: 'Amount Paid',
-                                    value:
-                                        '₹${b.totalAmount.toStringAsFixed(2)}',
-                                    valueColor: AppColors.success,
-                                    bold: true,
-                                  ),
-                                  const _TicketRow(
-                                    label: 'Status',
-                                    value: 'Confirmed',
-                                    valueColor: AppColors.success,
-                                    bold: true,
-                                  ),
-                                ],
+                                    // Details list
+                                    _TicketRow(
+                                      label: 'Vehicle Number',
+                                      value: b.vehicleNumber,
+                                      bold: true,
+                                    ),
+                                    _TicketRow(
+                                      label: 'Slot Assigned',
+                                      value:
+                                          '${b.slot?.slotNumber ?? "-"} (${AppHelpers.getSlotTypeLabel(b.slot?.slotType ?? "car")})',
+                                      bold: true,
+                                      valueColor: AppColors.primary,
+                                    ),
+                                    _TicketRow(
+                                      label: 'Location',
+                                      value: b.location?.name ?? 'Unknown',
+                                    ),
+                                    _TicketRow(
+                                      label: 'Booking Date',
+                                      value: b.bookingDate,
+                                    ),
+                                    _TicketRow(
+                                      label: 'Scheduled Time',
+                                      value:
+                                          '${AppHelpers.formatTime(b.startTime)} – ${AppHelpers.formatTime(b.endTime)}',
+                                    ),
+                                    _TicketRow(
+                                      label: 'Duration',
+                                      value:
+                                          '${b.totalHours.toStringAsFixed(1)} hours',
+                                    ),
+                                    const Divider(
+                                        color: AppColors.border, height: 20),
+                                    _TicketRow(
+                                      label: 'Amount Paid',
+                                      value: AppHelpers.formatCurrency(
+                                          b.totalAmount),
+                                      valueColor: AppColors.success,
+                                      bold: true,
+                                    ),
+                                    const _TicketRow(
+                                      label: 'Status',
+                                      value: 'Confirmed',
+                                      valueColor: AppColors.success,
+                                      bold: true,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+
+                      // Download Ticket to Device Gallery Button
+                      AppButton(
+                        label: _isDownloading
+                            ? 'Downloading Ticket...'
+                            : 'Download Ticket to Gallery 📥',
+                        color: AppColors.success,
+                        icon: Icons.download_rounded,
+                        onTap: _isDownloading ? null : _downloadTicketToGallery,
+                      ),
+                      const SizedBox(height: 16),
 
                       // Get Directions Button
                       if (b.location != null) ...[
@@ -332,7 +379,7 @@ class QrTicketScreen extends StatelessWidget {
                         children: [
                           Expanded(
                             child: AppButton(
-                              label: 'Share',
+                              label: 'Share Ref',
                               isOutlined: true,
                               icon: Icons.share_rounded,
                               onTap: () {

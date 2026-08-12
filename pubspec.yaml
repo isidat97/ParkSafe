@@ -46,6 +46,7 @@ dependencies:
   # Image
   image_picker: ^1.1.2
   flutter_image_compress: ^2.4.0
+  gal: ^2.3.0
 
   # Permission
   permission_handler: ^11.3.1

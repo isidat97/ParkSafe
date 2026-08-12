@@ -256,6 +256,11 @@ class StatusBadge extends StatelessWidget {
     String label;
 
     switch (status.toLowerCase()) {
+      case 'checked_in':
+        bg = AppColors.accent.withOpacity(0.15);
+        text = AppColors.accent;
+        label = 'Checked In';
+        break;
       case 'confirmed':
         bg = AppColors.success.withOpacity(0.12);
         text = AppColors.success;

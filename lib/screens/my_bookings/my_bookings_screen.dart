@@ -110,6 +110,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                         bookings: booking.bookings
                             .where((b) =>
                                 b.status == 'confirmed' ||
+                                b.status == 'checked_in' ||
                                 b.status == 'pending')
                             .toList(),
                         emptyTitle: 'No active bookings',

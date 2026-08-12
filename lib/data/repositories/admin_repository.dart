@@ -7,6 +7,7 @@ import '../models/parking_location.dart';
 import '../models/user_profile.dart';
 import 'booking_repository.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/app_helpers.dart';
 
 
 class AdminRepository {
@@ -133,8 +134,38 @@ class AdminRepository {
   }
 
 
-  Future<bool> checkIn(String bookingId) async {
+  Future<Map<String, dynamic>> checkIn(String bookingId) async {
     try {
+      // Fetch booking details to verify scheduled start time
+      final bData = await _client
+          .from(AppConstants.tableBookings)
+          .select('''
+            *,
+            parking_slots(
+              *,
+              parking_locations(*)
+            )
+          ''')
+          .eq('id', bookingId)
+          .maybeSingle();
+
+      if (bData != null) {
+        final booking = Booking.fromJson(bData);
+        final schedStart = booking.scheduledStartDateTime;
+        final now = DateTime.now();
+
+        // Enforce No Early Check-In Rule
+        if (schedStart != null && now.isBefore(schedStart)) {
+          final minsRemaining = schedStart.difference(now).inMinutes;
+          final timeStr = AppHelpers.formatTime(booking.startTime);
+          return {
+            'success': false,
+            'message':
+                'Early check-in not allowed. Booking starts at $timeStr ($minsRemaining mins remaining).'
+          };
+        }
+      }
+
       final nowStr = DateTime.now().toUtc().toIso8601String();
       await _client
           .from(AppConstants.tableBookings)
@@ -143,9 +174,10 @@ class AdminRepository {
             'actual_check_in': nowStr,
           })
           .eq('id', bookingId);
-      return true;
-    } catch (_) {
-      return false;
+
+      return {'success': true, 'message': 'Checked in successfully!'};
+    } catch (e) {
+      return {'success': false, 'message': 'Check-in failed: ${e.toString()}'};
     }
   }
 

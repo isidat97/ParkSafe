@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_helpers.dart';
 import '../../data/models/booking.dart';
+import '../../data/repositories/notification_repository.dart';
 import '../../providers/admin_provider.dart';
 
 class AdminBookingDetailScreen extends StatefulWidget {
@@ -32,10 +33,12 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
         'Mark vehicle ${booking.vehicleNumber} as checked in?', AppColors.accent);
     if (!confirm) return;
 
-    final success = await admin.checkIn(booking.id);
+    final result = await admin.checkIn(booking.id);
+    final isSuccess = result['success'] == true;
+    final msg = result['message'] as String? ?? (isSuccess ? 'Checked in successfully!' : 'Check-in failed');
+
     if (mounted) {
-      _toast(success ? 'Checked in successfully!' : 'Check-in failed',
-          success ? AppColors.success : AppColors.error);
+      _toast(msg, isSuccess ? AppColors.success : AppColors.error);
     }
   }
 
@@ -52,6 +55,130 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
     if (mounted) {
       _toast(success ? 'Checked out successfully!' : 'Check-out failed',
           success ? AppColors.success : AppColors.error);
+    }
+  }
+
+  Future<void> _acceptRefund(AdminProvider admin) async {
+    final booking = admin.scannedBooking;
+    if (booking == null) return;
+
+    final confirm = await _confirm(
+      'Accept Refund',
+      'Approve and refund ₹${booking.totalAmount.toStringAsFixed(2)} to customer?',
+      AppColors.success,
+    );
+    if (!confirm) return;
+
+    final success = await admin.processRefund(
+      bookingId: booking.id,
+      refundStatus: 'approved',
+      reason: 'Refund approved by admin.',
+    );
+
+    if (success) {
+      // Create notification for customer
+      try {
+        await NotificationRepository().createNotification(
+          userId: booking.userId,
+          title: 'Refund Approved! 💰',
+          body:
+              'Your refund request of ₹${booking.totalAmount.toStringAsFixed(2)} for ${booking.location?.name ?? "booking"} has been approved.',
+          type: 'refund',
+        );
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      _toast(
+        success ? 'Refund request approved successfully!' : 'Refund approval failed',
+        success ? AppColors.success : AppColors.error,
+      );
+    }
+  }
+
+  Future<void> _rejectRefund(AdminProvider admin) async {
+    final booking = admin.scannedBooking;
+    if (booking == null) return;
+
+    final reasonCtrl = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Reject Refund Request',
+            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Specify reason for rejecting this refund request:',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Reason for rejection...',
+                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                filled: true,
+                fillColor: AppColors.bgDark,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            child: const Text('Reject Refund',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final reason = reasonCtrl.text.trim().isEmpty
+        ? 'Refund request does not meet eligibility criteria.'
+        : reasonCtrl.text.trim();
+
+    final success = await admin.processRefund(
+      bookingId: booking.id,
+      refundStatus: 'rejected',
+      reason: reason,
+    );
+
+    if (success) {
+      // Create notification for customer
+      try {
+        await NotificationRepository().createNotification(
+          userId: booking.userId,
+          title: 'Refund Request Declined ❌',
+          body:
+              'Your refund request for ${booking.location?.name ?? "booking"} was rejected. Reason: $reason',
+          type: 'refund',
+        );
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      _toast(
+        success ? 'Refund request rejected.' : 'Operation failed',
+        success ? AppColors.warning : AppColors.error,
+      );
     }
   }
 
@@ -394,6 +521,8 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
                   booking: booking,
                   onCheckIn: () => _checkIn(admin),
                   onCheckOut: () => _checkOut(admin),
+                  onAcceptRefund: () => _acceptRefund(admin),
+                  onRejectRefund: () => _rejectRefund(admin),
                 ),
               ],
             );
@@ -609,19 +738,102 @@ class _ActionBar extends StatelessWidget {
   final Booking booking;
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
+  final VoidCallback onAcceptRefund;
+  final VoidCallback onRejectRefund;
 
   const _ActionBar({
     required this.booking,
     required this.onCheckIn,
     required this.onCheckOut,
+    required this.onAcceptRefund,
+    required this.onRejectRefund,
   });
 
   @override
   Widget build(BuildContext context) {
     final status = booking.status;
+    final isRefundRequested = booking.refundStatus == 'requested';
     final canCheckIn = status == 'confirmed' || status == 'pending';
     final canCheckOut = status == 'checked_in';
     final isDone = status == 'completed' || status == 'cancelled';
+
+    if (isRefundRequested) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: const BoxDecoration(
+          color: AppColors.bgCard,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded,
+                      color: AppColors.warning, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Customer requested refund: ₹${booking.refundAmount.toStringAsFixed(2)}${booking.refundReason != null ? " (${booking.refundReason})" : ""}',
+                      style: const TextStyle(
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onRejectRefund,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('Reject Refund',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onAcceptRefund,
+                    icon: const Icon(Icons.check_circle_rounded, size: 18),
+                    label: const Text('Accept Refund',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
 
     if (isDone) {
       return Container(

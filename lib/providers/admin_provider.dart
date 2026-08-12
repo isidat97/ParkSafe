@@ -248,16 +248,16 @@ class AdminProvider extends ChangeNotifier {
   // Check In / Check Out
   // ---------------------------------------------------------------------------
 
-  Future<bool> checkIn(String bookingId) async {
-    final success = await _repo.checkIn(bookingId);
-    if (success) {
+  Future<Map<String, dynamic>> checkIn(String bookingId) async {
+    final result = await _repo.checkIn(bookingId);
+    if (result['success'] == true) {
       // Update local state
       final now = DateTime.now();
       _scannedBooking = _bookingWithStatus(_scannedBooking, 'checked_in', actualCheckIn: now);
       _refreshBookingInLists(bookingId, 'checked_in', actualCheckIn: now);
       notifyListeners();
     }
-    return success;
+    return result;
   }
 
   Future<bool> checkOut(String bookingId) async {
