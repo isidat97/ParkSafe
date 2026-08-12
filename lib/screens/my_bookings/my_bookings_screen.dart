@@ -232,7 +232,9 @@ class _BookingCard extends StatelessWidget {
                   Icon(vehicleIcon, color: Colors.white, size: 22),
                   const SizedBox(height: 2),
                   Text(
-                    booking.slot?.slotNumber ?? '-',
+                    (booking.slot?.floor != null && booking.slot!.floor!.isNotEmpty)
+                        ? '${booking.slot!.floor} · Slot ${booking.slot?.slotNumber ?? '-'}'
+                        : 'Slot ${booking.slot?.slotNumber ?? '-'}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 9,

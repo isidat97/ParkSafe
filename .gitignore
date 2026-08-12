@@ -39,6 +39,17 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Environment & Secrets
+.env
+*.env
+serviceAccountKey.json
+
+# Temporary Office & Python files
+~$*.pptx
+~$*.docx
+__pycache__/
+*.pyc
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile

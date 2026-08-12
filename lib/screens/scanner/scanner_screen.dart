@@ -412,7 +412,12 @@ class _ScannedResult extends StatelessWidget {
               children: [
                 _Row(label: 'Location',
                     value: booking.location?.name ?? 'Unknown'),
-                _Row(label: 'Slot', value: booking.slot?.slotNumber ?? '-'),
+                _Row(
+                  label: 'Slot', 
+                  value: (booking.slot?.floor != null && booking.slot!.floor!.isNotEmpty) 
+                    ? '${booking.slot!.floor} · Slot ${booking.slot?.slotNumber ?? '-'}' 
+                    : (booking.slot?.slotNumber ?? '-')
+                ),
                 _Row(label: 'Vehicle', value: booking.vehicleNumber),
                 _Row(label: 'Date', value: booking.bookingDate),
                 _Row(

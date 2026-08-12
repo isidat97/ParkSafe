@@ -357,7 +357,7 @@ class _BookingRow extends StatelessWidget {
                         fontSize: 14),
                   ),
                   Text(
-                    '${booking.location?.name ?? "Unknown"} · Slot ${booking.slot?.slotNumber ?? "-"}',
+                    '${booking.location?.name ?? "Unknown"} · ${(booking.slot?.floor != null && booking.slot!.floor!.isNotEmpty) ? '${booking.slot!.floor} · ' : ''}Slot ${booking.slot?.slotNumber ?? "-"}',
                     style: const TextStyle(
                         color: AppColors.textSecondary, fontSize: 12),
                   ),

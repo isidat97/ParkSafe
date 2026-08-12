@@ -297,8 +297,9 @@ class _QrTicketScreenState extends State<QrTicketScreen> {
                                     ),
                                     _TicketRow(
                                       label: 'Slot Assigned',
-                                      value:
-                                          '${b.slot?.slotNumber ?? "-"} (${AppHelpers.getSlotTypeLabel(b.slot?.slotType ?? "car")})',
+                                      value: (b.slot?.floor != null && b.slot!.floor!.isNotEmpty)
+                                          ? '${b.slot!.floor} → Slot ${b.slot?.slotNumber ?? "-"}'
+                                          : 'Slot ${b.slot?.slotNumber ?? "-"}',
                                       bold: true,
                                       valueColor: AppColors.primary,
                                     ),

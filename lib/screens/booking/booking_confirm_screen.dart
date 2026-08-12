@@ -223,8 +223,10 @@ class _BookingConfirmScreenState extends State<BookingConfirmScreen>
                             const Divider(
                                 color: AppColors.border, height: 28),
                             _BookingRow(
-                              label: 'Slot Number',
-                              value: slot.slotNumber,
+                              label: 'Slot Assigned',
+                              value: (slot.floor != null && slot.floor!.isNotEmpty)
+                                  ? '${slot.floor} → Slot ${slot.slotNumber}'
+                                  : 'Slot ${slot.slotNumber}',
                               icon: Icons.directions_car_rounded,
                             ),
                             _BookingRow(

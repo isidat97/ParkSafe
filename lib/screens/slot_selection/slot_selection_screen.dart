@@ -24,7 +24,9 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSlots());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSlots();
+    });
   }
 
   Future<void> _loadSlots() async {
@@ -37,18 +39,26 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
       return;
     }
 
-    final dateStr =
-        '${booking.selectedDate!.year}-${booking.selectedDate!.month.toString().padLeft(2, '0')}-${booking.selectedDate!.day.toString().padLeft(2, '0')}';
-    final startStr =
-        '${booking.startTime!.hour.toString().padLeft(2, '0')}:${booking.startTime!.minute.toString().padLeft(2, '0')}:00';
-    final endStr =
-        '${booking.endTime!.hour.toString().padLeft(2, '0')}:${booking.endTime!.minute.toString().padLeft(2, '0')}:00';
+    final startDateTime = DateTime(
+      booking.selectedDate!.year,
+      booking.selectedDate!.month,
+      booking.selectedDate!.day,
+      booking.startTime!.hour,
+      booking.startTime!.minute,
+    );
+
+    final endDateTime = DateTime(
+      booking.selectedEndDate!.year,
+      booking.selectedEndDate!.month,
+      booking.selectedEndDate!.day,
+      booking.endTime!.hour,
+      booking.endTime!.minute,
+    );
 
     await parking.loadSlots(
       locationId: widget.location.id,
-      bookingDate: dateStr,
-      startTime: startStr,
-      endTime: endStr,
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
     );
   }
 
@@ -85,10 +95,21 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
     final allSlots = parking.slots;
     final filtered = _filterType == 'all'
         ? allSlots
-        : allSlots.where((s) => s.slotType == _filterType).toList();
+        : allSlots
+            .where((s) => s.slotType.toLowerCase() == _filterType.toLowerCase())
+            .toList();
 
-    final available = allSlots.where((s) => s.isAvailable).length;
-    final booked = allSlots.length - available;
+    final available = filtered.where((s) => s.isAvailable).length;
+    final booked = filtered.length - available;
+
+    // Group filtered slots by floor
+    final Map<String, List<ParkingSlot>> slotsByFloor = {};
+    for (var slot in filtered) {
+      final fl = (slot.floor != null && slot.floor!.trim().isNotEmpty)
+          ? slot.floor!.trim()
+          : 'Ground Floor';
+      slotsByFloor.putIfAbsent(fl, () => []).add(slot);
+    }
 
     return Scaffold(
       body: Container(
@@ -241,7 +262,7 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
                 ),
               ),
 
-              // Slot grid
+              // Floor-wise Slot list
               Expanded(
                 child: parking.isLoading
                     ? const Center(
@@ -255,18 +276,85 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
                             title: 'No slots found',
                             subtitle: 'Try a different filter or time',
                           )
-                        : GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 4,
-                              childAspectRatio: 1.1,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
-                            itemCount: filtered.length,
-                            itemBuilder: (ctx, i) =>
-                                _SlotTile(slot: filtered[i], onTap: _onSlotTap),
+                        : ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            itemCount: slotsByFloor.keys.length,
+                            itemBuilder: (ctx, idx) {
+                              final floorName = slotsByFloor.keys.elementAt(idx);
+                              final floorSlots = slotsByFloor[floorName]!;
+                              final availCount =
+                                  floorSlots.where((s) => s.isAvailable).length;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Floor Heading
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 16, 20, 10),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.layers_rounded,
+                                          color: AppColors.primary,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          floorName,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textPrimary,
+                                            letterSpacing: -0.2,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary
+                                                .withOpacity(0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            '$availCount available',
+                                            style: const TextStyle(
+                                              color: AppColors.primary,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Floor Slot Grid
+                                  GridView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 4,
+                                      childAspectRatio: 1.1,
+                                      crossAxisSpacing: 10,
+                                      mainAxisSpacing: 10,
+                                    ),
+                                    itemCount: floorSlots.length,
+                                    itemBuilder: (ctx, i) => _SlotTile(
+                                      slot: floorSlots[i],
+                                      onTap: _onSlotTap,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
               ),
 
@@ -285,7 +373,10 @@ class _SlotSelectionScreenState extends State<SlotSelectionScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Slot ${parking.selectedSlot!.slotNumber}',
+                            parking.selectedSlot?.floor != null &&
+                                    parking.selectedSlot!.floor!.isNotEmpty
+                                ? '${parking.selectedSlot!.floor} → Slot ${parking.selectedSlot!.slotNumber}'
+                                : 'Slot ${parking.selectedSlot!.slotNumber}',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -381,6 +472,19 @@ class _SlotTile extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (slot.floor != null && slot.floor!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                slot.floor!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: content.withOpacity(0.8),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       ),

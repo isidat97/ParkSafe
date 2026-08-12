@@ -326,6 +326,44 @@ class BookingRepository {
     }
   }
 
+  Future<bool> hasOverlappingBooking({
+    required String vehicleNumber,
+    required String bookingDate,
+    required DateTime newStart,
+    required DateTime newEnd,
+  }) async {
+    try {
+      final response = await _client
+          .from(AppConstants.tableBookings)
+          .select('booking_date, start_time, end_time')
+          .eq('vehicle_number', vehicleNumber)
+          .neq('status', 'cancelled');
+
+      final List data = response as List;
+      for (var row in data) {
+        final existingDateStr = row['booking_date'] as String;
+        // Check if dates overlap/match (simple check: if it's the same base date or multi-day involving our date)
+        // Since bookingDate could be "YYYY-MM-DD" or "YYYY-MM-DD to YYYY-MM-DD", let's parse both
+        final existStart = Booking.parseBookingDateTime(
+            existingDateStr.contains(' to ') ? existingDateStr.split(' to ')[0] : existingDateStr,
+            row['start_time'] as String);
+        final existEnd = Booking.parseBookingDateTime(
+            existingDateStr.contains(' to ') ? existingDateStr.split(' to ')[1] : existingDateStr,
+            row['end_time'] as String);
+
+        if (existStart != null && existEnd != null) {
+          // Overlap condition: (StartA < EndB) and (EndA > StartB)
+          if (newStart.isBefore(existEnd) && newEnd.isAfter(existStart)) {
+            return true; // Overlap detected
+          }
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> processRefund({
     required String bookingId,
     required String refundStatus, // 'approved', 'rejected', 'refunded'
@@ -343,6 +381,65 @@ class BookingRepository {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<Map<String, int>> getLiveAvailability({
+    required String locationId,
+    required String vehicleType,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    try {
+      // 1. Get all active slots of the requested type in this location
+      final slotsRes = await _client
+          .from(AppConstants.tableParkingSlots)
+          .select('id')
+          .eq('location_id', locationId)
+          .ilike('slot_type', '%$vehicleType%')
+          .eq('is_active', true);
+
+      final List slots = slotsRes as List;
+      final int totalSlots = slots.length;
+      if (totalSlots == 0) {
+        return {'total': 0, 'available': 0};
+      }
+
+      final slotIds = slots.map((s) => s['id'] as String).toList();
+
+      // 2. Get overlapping bookings
+      final bookingsRes = await _client
+          .from(AppConstants.tableBookings)
+          .select('slot_id, booking_date, start_time, end_time')
+          .neq('status', 'cancelled')
+          .inFilter('slot_id', slotIds);
+
+      final List bookingsData = bookingsRes as List;
+      Set<String> occupiedSlotIds = {};
+
+      for (var row in bookingsData) {
+        final existingDateStr = row['booking_date'] as String;
+        final existStart = Booking.parseBookingDateTime(
+            existingDateStr.contains(' to ') ? existingDateStr.split(' to ')[0] : existingDateStr,
+            row['start_time'] as String);
+        final existEnd = Booking.parseBookingDateTime(
+            existingDateStr.contains(' to ') ? existingDateStr.split(' to ')[1] : existingDateStr,
+            row['end_time'] as String);
+
+        if (existStart != null && existEnd != null) {
+          if (start.isBefore(existEnd) && end.isAfter(existStart)) {
+            occupiedSlotIds.add(row['slot_id'] as String);
+          }
+        }
+      }
+
+      return {
+        'total': totalSlots,
+        'available': totalSlots - occupiedSlotIds.length,
+      };
+    } catch (e) {
+      print('Error getting live availability: $e');
+      return {'total': 0, 'available': 0};
     }
   }
 }

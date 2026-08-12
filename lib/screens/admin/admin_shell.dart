@@ -12,6 +12,7 @@ import 'admin_slots_screen.dart';
 import 'admin_customers_screen.dart';
 import 'admin_revenue_screen.dart';
 import 'admin_add_location_screen.dart';
+import 'admin_refunds_screen.dart';
 
 
 class AdminShell extends StatefulWidget {
@@ -33,6 +34,7 @@ class _AdminShellState extends State<AdminShell> {
     _NavItem(icon: Icons.local_parking_rounded, label: 'Slots'),
     _NavItem(icon: Icons.add_location_alt_rounded, label: 'Add Place'),
     _NavItem(icon: Icons.people_alt_rounded, label: 'Customers'),
+    _NavItem(icon: Icons.currency_rupee_rounded, label: 'Refunds'),
     _NavItem(icon: Icons.bar_chart_rounded, label: 'Revenue'),
   ];
 
@@ -50,6 +52,7 @@ class _AdminShellState extends State<AdminShell> {
       const AdminSlotsScreen(),
       const AdminAddLocationScreen(),
       const AdminCustomersScreen(),
+      const AdminRefundsScreen(),
       const AdminRevenueScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {

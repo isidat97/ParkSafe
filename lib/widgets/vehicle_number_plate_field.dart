@@ -31,7 +31,7 @@ class _VehicleNumberPlateFieldState extends State<VehicleNumberPlateField> {
         Container(
           height: 64,
           decoration: BoxDecoration(
-            color: const Color(0xFFFECC00), // High-visibility yellow
+            color: Colors.white, // Standard white number plate
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: hasError ? AppColors.error : const Color(0xFF1E2838),
@@ -41,7 +41,7 @@ class _VehicleNumberPlateFieldState extends State<VehicleNumberPlateField> {
               BoxShadow(
                 color: hasError
                     ? AppColors.error.withOpacity(0.25)
-                    : const Color(0xFFFECC00).withOpacity(0.25),
+                    : const Color(0xFF1E2838).withOpacity(0.1),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -112,6 +112,7 @@ class _VehicleNumberPlateFieldState extends State<VehicleNumberPlateField> {
                         fontFamily: 'monospace',
                       ),
                       decoration: const InputDecoration(
+                        filled: false,
                         hintText: 'MH 12 AB 1234',
                         hintStyle: TextStyle(
                           fontSize: 18,

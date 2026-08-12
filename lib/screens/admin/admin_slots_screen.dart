@@ -113,6 +113,80 @@ class _AdminSlotsScreenState extends State<AdminSlotsScreen> {
     );
   }
 
+  void _showEditSlotDialog(BuildContext context, Map<String, dynamic> slot) {
+    final floorCtrl = TextEditingController(text: slot['floor'] as String? ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.layers_rounded, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Edit Slot Floor',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Slot ${slot['slot_number']} (${AppHelpers.getSlotTypeLabel(slot['slot_type'] as String? ?? 'car')})',
+                style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            const SizedBox(height: 16),
+            const Text('Enter Floor Name (e.g., Ground Floor, Basement 1):',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: floorCtrl,
+              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Ground Floor',
+                filled: true,
+                fillColor: AppColors.bgDark,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newFloor = floorCtrl.text.trim();
+              Navigator.pop(ctx);
+              final success = await context.read<AdminProvider>().updateSlotFloor(
+                    slot['id'] as String,
+                    newFloor,
+                  );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success ? 'Slot floor updated!' : 'Failed to update floor'),
+                    backgroundColor: success ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -359,82 +433,98 @@ class _AdminSlotsScreenState extends State<AdminSlotsScreen> {
                                     as Map<String, dynamic>?;
                                 final locName =
                                     locMap?['name'] as String? ?? '';
+                                final floorName = slot['floor'] as String? ?? '';
 
-                                return Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgCard,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: isActive
-                                          ? AppColors.primary.withOpacity(0.3)
-                                          : AppColors.border,
+                                return GestureDetector(
+                                  onTap: () => _showEditSlotDialog(context, slot),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.bgCard,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: isActive
+                                            ? AppColors.primary.withOpacity(0.3)
+                                            : AppColors.border,
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                            color: Color(0x0F14181B),
+                                            blurRadius: 4,
+                                            offset: Offset(0, 2)),
+                                      ],
                                     ),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                          color: Color(0x0F14181B),
-                                          blurRadius: 4,
-                                          offset: Offset(0, 2)),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            type == 'bike'
-                                                ? Icons.two_wheeler_rounded
-                                                : type == 'ev'
-                                                    ? Icons.electric_car_rounded
-                                                    : Icons
-                                                        .directions_car_rounded,
-                                            color: AppColors.primary,
-                                            size: 18,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            numStr,
-                                            style: const TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 14,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              type == 'bike'
+                                                  ? Icons.two_wheeler_rounded
+                                                  : type == 'ev'
+                                                      ? Icons.electric_car_rounded
+                                                      : Icons
+                                                          .directions_car_rounded,
+                                              color: AppColors.primary,
+                                              size: 18,
                                             ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              numStr,
+                                              style: const TextStyle(
+                                                color: AppColors.textPrimary,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (floorName.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            floorName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 10),
                                           ),
                                         ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.bgSurface2,
-                                          borderRadius:
-                                              BorderRadius.circular(999),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.bgSurface2,
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            AppHelpers.getSlotTypeLabel(type),
+                                            style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600),
+                                          ),
                                         ),
-                                        child: Text(
-                                          AppHelpers.getSlotTypeLabel(type),
-                                          style: const TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w600),
-                                        ),
-                                      ),
-                                      if (locName.isNotEmpty) ...[
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          locName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              color: AppColors.textMuted,
-                                              fontSize: 9),
-                                        ),
+                                        if (locName.isNotEmpty) ...[
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            locName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                color: AppColors.textMuted,
+                                                fontSize: 9),
+                                          ),
+                                        ],
                                       ],
-                                    ],
+                                    ),
                                   ),
                                 );
                               },

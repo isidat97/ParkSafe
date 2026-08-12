@@ -181,5 +181,21 @@ CREATE POLICY "Allow public access feedback" ON public.feedback FOR ALL USING (t
 DROP POLICY IF EXISTS "Allow public access notifications" ON public.notifications;
 CREATE POLICY "Allow public access notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
 
+-- =========================================================
+-- STEP 8: NEW COLUMNS MIGRATION
+-- =========================================================
+
+-- 1. Add floor column to parking_slots
+ALTER TABLE public.parking_slots 
+ADD COLUMN IF NOT EXISTS floor TEXT;
+
+-- 2. Add fcm_token column to profiles
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS fcm_token TEXT;
+
+-- 3. Add notifications_sent column to bookings
+ALTER TABLE public.bookings 
+ADD COLUMN IF NOT EXISTS notifications_sent JSONB DEFAULT '{}'::jsonb;
+
 -- Reload schema cache
 NOTIFY pgrst, 'reload schema';

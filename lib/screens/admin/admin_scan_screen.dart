@@ -26,7 +26,9 @@ class _AdminScanScreenState extends State<AdminScanScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initScanner();
-    _resetScan();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resetScan();
+    });
   }
 
   Future<void> _initScanner() async {

@@ -5,6 +5,7 @@ import '../supabase/supabase_config.dart';
 import '../models/booking.dart';
 import '../models/parking_location.dart';
 import '../models/user_profile.dart';
+import '../models/floor_config.dart';
 import 'booking_repository.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/app_helpers.dart';
@@ -312,6 +313,18 @@ class AdminRepository {
     return (data as List).cast<Map<String, dynamic>>();
   }
 
+  Future<bool> updateSlotFloor(String slotId, String floorName) async {
+    try {
+      await _client
+          .from(AppConstants.tableParkingSlots)
+          .update({'floor': floorName.trim()})
+          .eq('id', slotId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<ParkingLocation>> getAllLocations() async {
     final data = await _client
         .from(AppConstants.tableParkingLocations)
@@ -481,18 +494,26 @@ class AdminRepository {
     required List<String> amenities,
     String? imageUrl,
     String? googleMapsLink,
+    String? floor,
     int carSlots = 0,
     int bikeSlots = 0,
     int evSlots = 0,
+    List<FloorConfig>? floorConfigs,
   }) async {
     try {
       final locId = const Uuid().v4();
+
+      int finalTotalSlots = totalSlots;
+      if (floorConfigs != null && floorConfigs.isNotEmpty) {
+        finalTotalSlots = floorConfigs.fold<int>(0, (sum, f) => sum + f.totalSlots);
+      }
+
       final locData = {
         'id': locId,
         'name': name.trim(),
         'address': address.trim(),
         'price_per_hour': pricePerHour,
-        'total_slots': totalSlots,
+        'total_slots': finalTotalSlots,
         'amenities': amenities,
         'rating': 4.5,
         if (imageUrl != null && imageUrl.isNotEmpty)
@@ -505,47 +526,90 @@ class AdminRepository {
           .from(AppConstants.tableParkingLocations)
           .insert(locData);
 
-      // Generate slots: Car, Bike, EV
       final List<Map<String, dynamic>> slotsToInsert = [];
 
-      int cCount = carSlots;
-      int bCount = bikeSlots;
-      int eCount = evSlots;
-      if (cCount == 0 && bCount == 0 && eCount == 0) {
-        cCount = (totalSlots * 0.6).round();
-        bCount = (totalSlots * 0.25).round();
-        eCount = totalSlots - cCount - bCount;
-        if (eCount < 0) eCount = 0;
-      }
+      if (floorConfigs != null && floorConfigs.isNotEmpty) {
+        // Multi-floor slot generation
+        for (final fc in floorConfigs) {
+          final flName = fc.floorName.trim();
 
-      for (int i = 1; i <= cCount; i++) {
-        slotsToInsert.add({
-          'id': const Uuid().v4(),
-          'location_id': locId,
-          'slot_number': 'C-${i.toString().padLeft(2, '0')}',
-          'slot_type': 'car',
-          'is_active': true,
-        });
-      }
+          for (int i = 1; i <= fc.carSlots; i++) {
+            slotsToInsert.add({
+              'id': const Uuid().v4(),
+              'location_id': locId,
+              'slot_number': 'C-${i.toString().padLeft(2, '0')}',
+              'slot_type': 'car',
+              'is_active': true,
+              'floor': flName,
+            });
+          }
 
-      for (int i = 1; i <= bCount; i++) {
-        slotsToInsert.add({
-          'id': const Uuid().v4(),
-          'location_id': locId,
-          'slot_number': 'B-${i.toString().padLeft(2, '0')}',
-          'slot_type': 'bike',
-          'is_active': true,
-        });
-      }
+          for (int i = 1; i <= fc.bikeSlots; i++) {
+            slotsToInsert.add({
+              'id': const Uuid().v4(),
+              'location_id': locId,
+              'slot_number': 'B-${i.toString().padLeft(2, '0')}',
+              'slot_type': 'bike',
+              'is_active': true,
+              'floor': flName,
+            });
+          }
 
-      for (int i = 1; i <= eCount; i++) {
-        slotsToInsert.add({
-          'id': const Uuid().v4(),
-          'location_id': locId,
-          'slot_number': 'E-${i.toString().padLeft(2, '0')}',
-          'slot_type': 'ev',
-          'is_active': true,
-        });
+          for (int i = 1; i <= fc.evSlots; i++) {
+            slotsToInsert.add({
+              'id': const Uuid().v4(),
+              'location_id': locId,
+              'slot_number': 'E-${i.toString().padLeft(2, '0')}',
+              'slot_type': 'ev',
+              'is_active': true,
+              'floor': flName,
+            });
+          }
+        }
+      } else {
+        // Single floor / standard slot generation
+        int cCount = carSlots;
+        int bCount = bikeSlots;
+        int eCount = evSlots;
+        if (cCount == 0 && bCount == 0 && eCount == 0) {
+          cCount = (totalSlots * 0.6).round();
+          bCount = (totalSlots * 0.25).round();
+          eCount = totalSlots - cCount - bCount;
+          if (eCount < 0) eCount = 0;
+        }
+
+        for (int i = 1; i <= cCount; i++) {
+          slotsToInsert.add({
+            'id': const Uuid().v4(),
+            'location_id': locId,
+            'slot_number': 'C-${i.toString().padLeft(2, '0')}',
+            'slot_type': 'car',
+            'is_active': true,
+            if (floor != null && floor.isNotEmpty) 'floor': floor.trim(),
+          });
+        }
+
+        for (int i = 1; i <= bCount; i++) {
+          slotsToInsert.add({
+            'id': const Uuid().v4(),
+            'location_id': locId,
+            'slot_number': 'B-${i.toString().padLeft(2, '0')}',
+            'slot_type': 'bike',
+            'is_active': true,
+            if (floor != null && floor.isNotEmpty) 'floor': floor.trim(),
+          });
+        }
+
+        for (int i = 1; i <= eCount; i++) {
+          slotsToInsert.add({
+            'id': const Uuid().v4(),
+            'location_id': locId,
+            'slot_number': 'E-${i.toString().padLeft(2, '0')}',
+            'slot_type': 'ev',
+            'is_active': true,
+            if (floor != null && floor.isNotEmpty) 'floor': floor.trim(),
+          });
+        }
       }
 
       if (slotsToInsert.isNotEmpty) {

@@ -276,7 +276,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                                         label: 'Ref No', value: bookingRef),
                                     _DetailRow(
                                         label: 'Slot',
-                                        value: booking.slot?.slotNumber ?? '-'),
+                                        value: (booking.slot?.floor != null && booking.slot!.floor!.isNotEmpty)
+                                            ? '${booking.slot!.floor} · Slot ${booking.slot?.slotNumber ?? '-'}'
+                                            : (booking.slot?.slotNumber ?? '-')),
                                     _DetailRow(
                                         label: 'Vehicle',
                                         value: booking.vehicleNumber),

@@ -192,7 +192,7 @@ class _BookingTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${booking.location?.name ?? "Unknown Location"} · Slot ${booking.slot?.slotNumber ?? "-"}',
+                    '${booking.location?.name ?? "Unknown Location"} · ${(booking.slot?.floor != null && booking.slot!.floor!.isNotEmpty) ? '${booking.slot!.floor} · ' : ''}Slot ${booking.slot?.slotNumber ?? "-"}',
                     style: const TextStyle(
                         color: AppColors.textSecondary, fontSize: 12),
                   ),

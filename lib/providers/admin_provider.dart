@@ -3,6 +3,7 @@ import '../data/repositories/admin_repository.dart';
 import '../data/models/booking.dart';
 import '../data/models/parking_location.dart';
 import '../data/models/user_profile.dart';
+import '../data/models/floor_config.dart';
 
 class AdminProvider extends ChangeNotifier {
   final AdminRepository _repo = AdminRepository();
@@ -431,9 +432,11 @@ class AdminProvider extends ChangeNotifier {
     required List<String> amenities,
     String? imageUrl,
     String? googleMapsLink,
+    String? floor,
     int carSlots = 0,
     int bikeSlots = 0,
     int evSlots = 0,
+    List<FloorConfig>? floorConfigs,
   }) async {
     _isLoading = true;
     _error = null;
@@ -448,9 +451,11 @@ class AdminProvider extends ChangeNotifier {
         amenities: amenities,
         imageUrl: imageUrl,
         googleMapsLink: googleMapsLink,
+        floor: floor,
         carSlots: carSlots,
         bikeSlots: bikeSlots,
         evSlots: evSlots,
+        floorConfigs: floorConfigs,
       );
       if (success) {
         await loadSlots();
@@ -481,6 +486,26 @@ class AdminProvider extends ChangeNotifier {
       );
       if (success) {
         await loadSlots();
+      }
+      return success;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateSlotFloor(String slotId, String floor) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final success = await _repo.updateSlotFloor(slotId, floor);
+      if (success) {
+        await loadSlots(); // Refresh slot list
       }
       return success;
     } catch (e) {

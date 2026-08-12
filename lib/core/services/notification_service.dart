@@ -6,6 +6,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../../firebase_options.dart';
 import '../../data/models/booking.dart';
+import '../../data/repositories/auth_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -88,6 +89,9 @@ class NotificationService {
       try {
         _fcmToken = await messaging.getToken();
         debugPrint('FCM Token: $_fcmToken');
+        if (_fcmToken != null) {
+          await AuthRepository().saveFcmToken(_fcmToken!);
+        }
       } catch (e) {
         debugPrint('Failed to get FCM token: $e');
       }
@@ -150,79 +154,14 @@ class NotificationService {
     }
   }
 
-  /// Requirement 5: Schedules Check-In (15m before start) and Check-Out (15m before end) Reminders
+  /// Requirement 5: Schedule Reminders (handled by backend now)
   Future<void> scheduleBookingReminders(Booking booking) async {
-    try {
-      final startDt = booking.scheduledStartDateTime;
-      final endDt = booking.scheduledEndDateTime;
-      final locationName = booking.location?.name ?? 'your booked parking';
-
-      final bookingHash = booking.id.hashCode.abs();
-
-      // 1. Check-In Reminder (15 minutes before booking start)
-      if (startDt != null) {
-        final checkInReminderTime = startDt.subtract(const Duration(minutes: 15));
-        if (checkInReminderTime.isAfter(DateTime.now())) {
-          final tzTime = tz.TZDateTime.from(checkInReminderTime, tz.local);
-          await _localNotifications.zonedSchedule(
-            bookingHash % 100000 + 1,
-            '🅿️ Upcoming Parking Check-In',
-            'Reminder: Your booking at $locationName starts at ${booking.startTime} (in 15 mins). Get ready to check in!',
-            tzTime,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'parksafe_channel',
-                'ParkSafe Notifications',
-                importance: Importance.max,
-                priority: Priority.high,
-              ),
-              iOS: DarwinNotificationDetails(),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-          );
-          debugPrint('Scheduled Check-In Reminder at $checkInReminderTime');
-        }
-      }
-
-      // 2. Check-Out Reminder (15 minutes before booking end)
-      if (endDt != null) {
-        final checkOutReminderTime = endDt.subtract(const Duration(minutes: 15));
-        if (checkOutReminderTime.isAfter(DateTime.now())) {
-          final tzTime = tz.TZDateTime.from(checkOutReminderTime, tz.local);
-          await _localNotifications.zonedSchedule(
-            bookingHash % 100000 + 2,
-            '⏰ Parking Duration Ending Soon',
-            'Reminder: Your booking at $locationName ends at ${booking.endTime} (in 15 mins). Please return to your vehicle or extend your booking to avoid overtime charges!',
-            tzTime,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'parksafe_channel',
-                'ParkSafe Notifications',
-                importance: Importance.max,
-                priority: Priority.high,
-              ),
-              iOS: DarwinNotificationDetails(),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-          );
-          debugPrint('Scheduled Check-Out Reminder at $checkOutReminderTime');
-        }
-      }
-    } catch (e) {
-      debugPrint('Error scheduling booking reminders: $e');
-    }
+    // Reminders are now handled by the Python backend scheduler.
+    // We keep the method signature so we don't break existing calls.
   }
 
   /// Cancels scheduled reminders for a specific booking
   Future<void> cancelBookingReminders(String bookingId) async {
-    try {
-      final bookingHash = bookingId.hashCode.abs();
-      await _localNotifications.cancel(bookingHash % 100000 + 1);
-      await _localNotifications.cancel(bookingHash % 100000 + 2);
-    } catch (_) {}
+    // Reminders are now handled by the Python backend scheduler.
   }
 }

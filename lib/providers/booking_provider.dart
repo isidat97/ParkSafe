@@ -139,6 +139,30 @@ class BookingProvider extends ChangeNotifier {
           '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}:00';
       final amount = calculateAmount(location.pricePerHour);
 
+      // Fraud / Anomaly Detection Check: Ensure no overlapping bookings for the same vehicle
+      final newStart = DateTime(
+        _selectedDate!.year, _selectedDate!.month, _selectedDate!.day,
+        _startTime!.hour, _startTime!.minute
+      );
+      final newEnd = DateTime(
+        endDate.year, endDate.month, endDate.day,
+        _endTime!.hour, _endTime!.minute
+      );
+
+      final hasOverlap = await _repo.hasOverlappingBooking(
+        vehicleNumber: _vehicleNumber,
+        bookingDate: dateStr,
+        newStart: newStart,
+        newEnd: newEnd,
+      );
+
+      if (hasOverlap) {
+        _error = 'Fraud Alert: This vehicle already has an overlapping booking during this time period.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
       final created = await _repo.createBooking(
         userId: userId,
         slotId: slot.id,

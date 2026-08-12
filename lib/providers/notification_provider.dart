@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/models/notification_model.dart';
 import '../data/repositories/notification_repository.dart';
 import '../core/services/notification_service.dart';
+import '../data/supabase/supabase_config.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final NotificationRepository _repo = NotificationRepository();
   final NotificationService _service = NotificationService();
+  RealtimeChannel? _subscription;
 
   List<NotificationModel> _notifications = [];
   bool _isLoading = false;
@@ -21,12 +24,46 @@ class NotificationProvider extends ChangeNotifier {
 
     try {
       _notifications = await _repo.getNotifications(userId);
+      _setupRealtimeSubscription(userId);
     } catch (_) {
       _notifications = [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void _setupRealtimeSubscription(String userId) {
+    if (_subscription != null) return;
+    
+    _subscription = SupabaseConfig.client
+        .channel('public:notifications:user_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          callback: (payload) {
+            final newRow = payload.newRecord;
+            if (newRow != null) {
+              final notifUserId = newRow['user_id'] as String?;
+              if (notifUserId == userId || notifUserId == 'all') {
+                final notif = NotificationModel.fromJson(newRow);
+                // Prevent duplicate if we were the one who just inserted it locally
+                if (!_notifications.any((n) => n.id == notif.id)) {
+                  _notifications.insert(0, notif);
+                  notifyListeners();
+                  
+                  // Trigger local push banner for incoming remote notification
+                  _service.showNotification(
+                    title: notif.title,
+                    body: notif.body,
+                  );
+                }
+              }
+            }
+          },
+        )
+        .subscribe();
   }
 
   Future<void> addNotification({
@@ -43,8 +80,10 @@ class NotificationProvider extends ChangeNotifier {
     );
 
     if (notification != null) {
-      _notifications.insert(0, notification);
-      notifyListeners();
+      if (!_notifications.any((n) => n.id == notification.id)) {
+        _notifications.insert(0, notification);
+        notifyListeners();
+      }
     }
 
     // Trigger local push banner
@@ -67,5 +106,11 @@ class NotificationProvider extends ChangeNotifier {
     _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
     notifyListeners();
     await _repo.markAllAsRead(userId);
+  }
+
+  @override
+  void dispose() {
+    _subscription?.unsubscribe();
+    super.dispose();
   }
 }

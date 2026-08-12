@@ -68,9 +68,8 @@ class ParkingProvider extends ChangeNotifier {
 
   Future<void> loadSlots({
     required String locationId,
-    required String bookingDate,
-    required String startTime,
-    required String endTime,
+    required DateTime startDateTime,
+    required DateTime endDateTime,
   }) async {
     _isLoading = true;
     _selectedSlot = null;
@@ -80,9 +79,8 @@ class ParkingProvider extends ChangeNotifier {
     try {
       _slots = await _repo.getSlotsForLocation(
         locationId: locationId,
-        bookingDate: bookingDate,
-        startTime: startTime,
-        endTime: endTime,
+        startDateTime: startDateTime,
+        endDateTime: endDateTime,
       );
     } catch (e) {
       _error = e.toString();

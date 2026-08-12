@@ -10,6 +10,7 @@ import 'providers/booking_provider.dart';
 import 'providers/parking_provider.dart';
 import 'providers/admin_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/recommendation_provider.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -18,6 +19,8 @@ import 'screens/location_selection/location_selection_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/notifications/notifications_screen.dart';
+import 'screens/my_bookings/customer_refunds_screen.dart';
+import 'screens/recommendation/nearest_available_slots_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,6 +69,7 @@ class ParkSafeApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => AdminProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => RecommendationProvider()),
       ],
       child: MaterialApp(
         title: 'ParkSafe',
@@ -81,6 +85,8 @@ class ParkSafeApp extends StatelessWidget {
           '/home': (_) => const HomeScreen(),
           '/admin': (_) => const AdminShell(),
           '/notifications': (_) => const NotificationsScreen(),
+          '/my-refunds': (_) => const CustomerRefundsScreen(),
+          '/nearest-slots': (_) => const NearestAvailableSlotsScreen(),
         },
       ),
     );

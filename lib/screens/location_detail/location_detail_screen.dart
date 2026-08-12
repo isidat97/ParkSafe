@@ -6,6 +6,8 @@ import '../../data/models/parking_location.dart';
 import '../../providers/booking_provider.dart';
 import '../../widgets/common_widgets.dart';
 import '../slot_selection/slot_selection_screen.dart';
+import '../../core/services/prediction_service.dart';
+import '../../data/repositories/booking_repository.dart';
 
 class LocationDetailScreen extends StatefulWidget {
   final ParkingLocation location;
@@ -21,6 +23,11 @@ class _LocationDetailScreenState extends State<LocationDetailScreen> {
   DateTime _selectedEndDate = DateTime.now();
   TimeOfDay _startTime = TimeOfDay.now();
   late TimeOfDay _endTime;
+  double? _predictedAvailability;
+  Map<String, int>? _liveAvailability;
+  bool _isPredicting = false;
+  String _selectedVehicleType = 'Car';
+  final _bookingRepo = BookingRepository();
 
   @override
   void initState() {
@@ -28,6 +35,47 @@ class _LocationDetailScreenState extends State<LocationDetailScreen> {
     final now = TimeOfDay.now();
     _startTime = TimeOfDay(hour: now.hour, minute: 0);
     _endTime = TimeOfDay(hour: (now.hour + 2).clamp(0, 23), minute: 0);
+    _fetchAvailability();
+  }
+
+  Future<void> _fetchAvailability() async {
+    if (_totalHours <= 0) return;
+    
+    setState(() => _isPredicting = true);
+    
+    // 1. Fetch AI Prediction
+    final service = PredictionService();
+    final avail = await service.predictAvailability(widget.location.id, _startTime.hour);
+    
+    // 2. Fetch Live Availability
+    final start = _toStartDateTime(_startTime);
+    final end = _toEndDateTime(_endTime);
+    final live = await _bookingRepo.getLiveAvailability(
+      locationId: widget.location.id,
+      vehicleType: _selectedVehicleType,
+      start: start,
+      end: end,
+    );
+
+    if (mounted) {
+      setState(() {
+        _predictedAvailability = avail;
+        _liveAvailability = live;
+        _isPredicting = false;
+      });
+    }
+  }
+
+  String _getLiveAvailabilityText() {
+    final total = _liveAvailability!['total'] ?? 0;
+    final available = _liveAvailability!['available'] ?? 0;
+    
+    if (total == 0) return 'No $_selectedVehicleType slots available at this location.';
+    if (available == 0) return 'Fully Booked — No slots available for this time.';
+    if (available == total) return '100% Available — No bookings for this time slot.';
+    
+    final percentage = (available / total * 100).toStringAsFixed(0);
+    return 'Live Availability: $percentage% ($available/$total slots available)';
   }
 
   Future<void> _pickStartDate() async {
@@ -54,6 +102,7 @@ class _LocationDetailScreenState extends State<LocationDetailScreen> {
           _selectedEndDate = _selectedDate;
         }
       });
+      _fetchAvailability();
     }
   }
 
@@ -80,6 +129,7 @@ class _LocationDetailScreenState extends State<LocationDetailScreen> {
       setState(() {
         _selectedEndDate = picked;
       });
+      _fetchAvailability();
     }
   }
 
@@ -110,6 +160,7 @@ class _LocationDetailScreenState extends State<LocationDetailScreen> {
           _endTime = picked;
         }
       });
+      _fetchAvailability();
     }
   }
 
@@ -370,6 +421,138 @@ class _LocationDetailScreenState extends State<LocationDetailScreen> {
                     const SizedBox(height: 20),
 
                     // Booking section
+                    
+                    // Vehicle Type Selector
+                    const Text(
+                      'Vehicle Type',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: ['Car', 'Bike', 'EV'].map((type) {
+                        final isSelected = _selectedVehicleType == type;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() => _selectedVehicleType = type);
+                              _fetchAvailability();
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.primary : AppColors.bgSurface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primary : AppColors.border,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                type,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Predictive Availability Banner
+                    if (_isPredicting)
+                      const Center(child: Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: CircularProgressIndicator(color: AppColors.primary),
+                      ))
+                    else if (_liveAvailability != null)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Live Availability
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  _liveAvailability!['available'] == 0 
+                                    ? Icons.block 
+                                    : Icons.check_circle_rounded,
+                                  color: _liveAvailability!['available'] == 0 
+                                    ? AppColors.error 
+                                    : AppColors.success,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _getLiveAvailabilityText(),
+                                    style: TextStyle(
+                                      color: _liveAvailability!['available'] == 0 
+                                        ? AppColors.error 
+                                        : AppColors.textPrimary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_predictedAvailability != null) ...[
+                              const SizedBox(height: 12),
+                              const Divider(color: AppColors.border),
+                              const SizedBox(height: 12),
+                              // AI Prediction
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.auto_awesome, color: AppColors.info, size: 16),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: RichText(
+                                      text: TextSpan(
+                                        children: [
+                                          const TextSpan(
+                                            text: 'AI Prediction: ',
+                                            style: TextStyle(
+                                              color: AppColors.info,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: 'High availability expected at ${_startTime.format(context)}',
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [

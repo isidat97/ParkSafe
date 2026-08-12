@@ -473,7 +473,9 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
                             _Row('Address',
                                 booking.location?.address ?? 'N/A'),
                             _Row('Slot Number',
-                                booking.slot?.slotNumber ?? '-'),
+                                (booking.slot?.floor != null && booking.slot!.floor!.isNotEmpty)
+                                    ? '${booking.slot!.floor} · Slot ${booking.slot?.slotNumber ?? '-'}'
+                                    : (booking.slot?.slotNumber ?? '-')),
                           ],
                         ),
                         const SizedBox(height: 12),

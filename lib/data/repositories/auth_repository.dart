@@ -64,7 +64,22 @@ class AuthRepository {
   Future<void> updateProfile(UserProfile profile) async {
     await _client
         .from(AppConstants.tableProfiles)
-        .upsert(profile.toJson());
+        .update({
+          'full_name': profile.fullName,
+          'phone': profile.phone,
+          if (profile.fcmToken != null) 'fcm_token': profile.fcmToken,
+        })
+        .eq('id', profile.id);
+  }
+
+  Future<void> saveFcmToken(String token) async {
+    final user = currentUser;
+    if (user != null) {
+      await _client
+          .from(AppConstants.tableProfiles)
+          .update({'fcm_token': token})
+          .eq('id', user.id);
+    }
   }
 
   User? get currentUser => _client.auth.currentUser;

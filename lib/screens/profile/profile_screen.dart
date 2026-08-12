@@ -115,55 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Avatar
-              Stack(
-                children: [
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        (profile?.fullName?.isNotEmpty == true)
-                            ? profile!.fullName![0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                        border:
-                            Border.all(color: AppColors.bgDark, width: 2),
-                      ),
-                      child: const Icon(Icons.camera_alt_rounded,
-                          color: Colors.white, size: 14),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+
               Text(
                 profile?.fullName ?? 'User',
                 style: const TextStyle(
@@ -239,6 +191,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           );
                         }
                       },
+                    ),
+                    _SettingsTile(
+                      icon: Icons.currency_rupee_rounded,
+                      label: 'My Refunds',
+                      onTap: () => Navigator.pushNamed(context, '/my-refunds'),
                     ),
                     _SettingsTile(
                       icon: Icons.privacy_tip_outlined,

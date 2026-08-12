@@ -205,8 +205,17 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> updateProfile(UserProfile updated) async {
     try {
       await _repo.updateProfile(updated);
-      _profile = updated;
-      await _saveProfileToPrefs(updated);
+      
+      // Reload profile from DB to ensure it reflects exact saved state
+      final freshProfile = await _repo.getProfile(updated.id);
+      if (freshProfile != null) {
+        _profile = freshProfile;
+        await _saveProfileToPrefs(freshProfile);
+      } else {
+        _profile = updated;
+        await _saveProfileToPrefs(updated);
+      }
+      
       notifyListeners();
       return true;
     } catch (e) {

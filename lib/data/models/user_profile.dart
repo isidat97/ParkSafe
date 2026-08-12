@@ -5,6 +5,7 @@ class UserProfile {
   final String? password;
   final String? avatarUrl;
   final String? role;
+  final String? fcmToken;
   final DateTime? createdAt;
 
   UserProfile({
@@ -14,6 +15,7 @@ class UserProfile {
     this.password,
     this.avatarUrl,
     this.role,
+    this.fcmToken,
     this.createdAt,
   });
 
@@ -25,6 +27,7 @@ class UserProfile {
       password: json['password'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       role: json['role'] as String?,
+      fcmToken: json['fcm_token'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -39,6 +42,7 @@ class UserProfile {
       'password': password,
       'avatar_url': avatarUrl,
       'role': role,
+      'fcm_token': fcmToken,
     };
   }
 
@@ -47,6 +51,7 @@ class UserProfile {
     String? phone,
     String? avatarUrl,
     String? role,
+    String? fcmToken,
   }) {
     return UserProfile(
       id: id,
@@ -54,6 +59,7 @@ class UserProfile {
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       role: role ?? this.role,
+      fcmToken: fcmToken ?? this.fcmToken,
       createdAt: createdAt,
     );
   }

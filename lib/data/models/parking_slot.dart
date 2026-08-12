@@ -4,6 +4,7 @@ class ParkingSlot {
   final String slotNumber;
   final String slotType;
   final bool isActive;
+  final String? floor;
   bool isAvailable;
   bool isSelected;
 
@@ -13,6 +14,7 @@ class ParkingSlot {
     required this.slotNumber,
     required this.slotType,
     required this.isActive,
+    this.floor,
     this.isAvailable = true,
     this.isSelected = false,
   });
@@ -24,6 +26,7 @@ class ParkingSlot {
       slotNumber: json['slot_number'] as String,
       slotType: json['slot_type'] as String,
       isActive: json['is_active'] as bool? ?? true,
+      floor: json['floor'] as String?,
       isAvailable: json['is_available'] as bool? ?? true,
     );
   }
@@ -35,16 +38,18 @@ class ParkingSlot {
       'slot_number': slotNumber,
       'slot_type': slotType,
       'is_active': isActive,
+      'floor': floor,
     };
   }
 
-  ParkingSlot copyWith({bool? isAvailable, bool? isSelected}) {
+  ParkingSlot copyWith({bool? isAvailable, bool? isSelected, String? floor}) {
     return ParkingSlot(
       id: id,
       locationId: locationId,
       slotNumber: slotNumber,
       slotType: slotType,
       isActive: isActive,
+      floor: floor ?? this.floor,
       isAvailable: isAvailable ?? this.isAvailable,
       isSelected: isSelected ?? this.isSelected,
     );
