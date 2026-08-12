@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "291353004459",
+    "project_id": "parkesafe",
+    "storage_bucket": "parkesafe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:291353004459:android:1e064a4782b91ae8b0eaee",
+        "android_client_info": {
+          "package_name": "com.parksafe.parksafe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7TcnUzg4G--44BTJtSWZk-5ZymBZoh80"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
