@@ -197,5 +197,122 @@ ADD COLUMN IF NOT EXISTS fcm_token TEXT;
 ALTER TABLE public.bookings 
 ADD COLUMN IF NOT EXISTS notifications_sent JSONB DEFAULT '{}'::jsonb;
 
+-- =========================================================
+-- STEP 9: ADMIN-SPECIFIC LOCATION MAPPING & QR VALIDATION
+-- =========================================================
+
+-- 1. Create profiles table if not exists and add all required columns
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id TEXT PRIMARY KEY,
+  phone TEXT UNIQUE,
+  full_name TEXT,
+  role TEXT DEFAULT 'customer',
+  password TEXT,
+  assigned_location_id TEXT,
+  avatar_url TEXT,
+  fcm_token TEXT,
+  vehicle_number TEXT,
+  vehicle_type TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS full_name TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'customer';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS password TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS assigned_location_id TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS fcm_token TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS vehicle_number TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS vehicle_type TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+-- 2. Insert Surat RR Mall into parking_locations if not exists
+INSERT INTO public.parking_locations (id, name, address, total_slots, price_per_hour, rating, lat, lng, amenities)
+VALUES
+  ('b0000000-0000-0000-0000-000000000051', 'Surat RR Mall', 'RR Mall Road, Piplod, Surat, GJ 395007', 80, 40.00, 4.6, 21.1520, 72.7810, ARRAY['CCTV', 'EV Charging', 'Accessible', '24/7 Security'])
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  address = EXCLUDED.address,
+  total_slots = EXCLUDED.total_slots,
+  price_per_hour = EXCLUDED.price_per_hour;
+
+-- 3. Auto-generate slots for Surat RR Mall
+DO $$
+DECLARE
+  i INT;
+BEGIN
+  FOR i IN 1..15 LOOP
+    INSERT INTO public.parking_slots (location_id, slot_number, slot_type)
+    VALUES ('b0000000-0000-0000-0000-000000000051', 'A' || i, 'car')
+    ON CONFLICT (location_id, slot_number) DO NOTHING;
+  END LOOP;
+  FOR i IN 1..10 LOOP
+    INSERT INTO public.parking_slots (location_id, slot_number, slot_type)
+    VALUES ('b0000000-0000-0000-0000-000000000051', 'B' || i, 'bike')
+    ON CONFLICT (location_id, slot_number) DO NOTHING;
+  END LOOP;
+END $$;
+
+-- 4. Create Dedicated admin_accounts Table & Seed Location Admins
+CREATE TABLE IF NOT EXISTS public.admin_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone TEXT UNIQUE NOT NULL,
+  full_name TEXT NOT NULL,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'admin',
+  assigned_location_id TEXT,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.admin_accounts ADD COLUMN IF NOT EXISTS phone TEXT UNIQUE;
+ALTER TABLE public.admin_accounts ADD COLUMN IF NOT EXISTS full_name TEXT;
+ALTER TABLE public.admin_accounts ADD COLUMN IF NOT EXISTS password TEXT;
+ALTER TABLE public.admin_accounts ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'admin';
+ALTER TABLE public.admin_accounts ADD COLUMN IF NOT EXISTS assigned_location_id TEXT;
+ALTER TABLE public.admin_accounts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE public.admin_accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE public.admin_accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public access to admin_accounts" ON public.admin_accounts;
+CREATE POLICY "Allow public access to admin_accounts" ON public.admin_accounts FOR ALL USING (true) WITH CHECK (true);
+
+-- Main Admin / Super Admin (Access to ALL Locations)
+INSERT INTO public.admin_accounts (id, phone, full_name, role, password, assigned_location_id)
+VALUES ('a0000000-0000-0000-0000-000000000001', '9999988888', 'Main Admin (All Locations)', 'super_admin', '123456', NULL)
+ON CONFLICT (phone) DO UPDATE SET
+  role = 'super_admin',
+  full_name = EXCLUDED.full_name,
+  password = EXCLUDED.password,
+  assigned_location_id = NULL;
+
+-- Surat VR Mall Admin
+INSERT INTO public.admin_accounts (id, phone, full_name, role, password, assigned_location_id)
+VALUES ('a0000000-0000-0000-0000-000000000002', '9999911111', 'Surat VR Mall Admin', 'admin', '123456', 'b0000000-0000-0000-0000-000000000034')
+ON CONFLICT (phone) DO UPDATE SET
+  role = 'admin',
+  full_name = EXCLUDED.full_name,
+  password = EXCLUDED.password,
+  assigned_location_id = 'b0000000-0000-0000-0000-000000000034';
+
+-- Mumbai Airport Admin
+INSERT INTO public.admin_accounts (id, phone, full_name, role, password, assigned_location_id)
+VALUES ('a0000000-0000-0000-0000-000000000003', '9999922222', 'Mumbai Airport Admin', 'admin', '123456', 'b0000000-0000-0000-0000-000000000009')
+ON CONFLICT (phone) DO UPDATE SET
+  role = 'admin',
+  full_name = EXCLUDED.full_name,
+  password = EXCLUDED.password,
+  assigned_location_id = 'b0000000-0000-0000-0000-000000000009';
+
+-- Surat RR Mall Admin
+INSERT INTO public.admin_accounts (id, phone, full_name, role, password, assigned_location_id)
+VALUES ('a0000000-0000-0000-0000-000000000004', '9999933333', 'Surat RR Mall Admin', 'admin', '123456', 'b0000000-0000-0000-0000-000000000051')
+ON CONFLICT (phone) DO UPDATE SET
+  role = 'admin',
+  full_name = EXCLUDED.full_name,
+  password = EXCLUDED.password,
+  assigned_location_id = 'b0000000-0000-0000-0000-000000000051';
+
 -- Reload schema cache
 NOTIFY pgrst, 'reload schema';

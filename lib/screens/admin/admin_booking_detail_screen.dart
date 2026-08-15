@@ -29,6 +29,12 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
     final booking = admin.scannedBooking;
     if (booking == null) return;
 
+    if (!admin.isQrValid(booking)) {
+      final val = admin.validateBookingLocation(booking);
+      _toast(val['message'] as String, AppColors.error);
+      return;
+    }
+
     final confirm = await _confirm('Check In',
         'Mark vehicle ${booking.vehicleNumber} as checked in?', AppColors.accent);
     if (!confirm) return;
@@ -45,6 +51,12 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
   Future<void> _checkOut(AdminProvider admin) async {
     final booking = admin.scannedBooking;
     if (booking == null) return;
+
+    if (!admin.isQrValid(booking)) {
+      final val = admin.validateBookingLocation(booking);
+      _toast(val['message'] as String, AppColors.error);
+      return;
+    }
 
     final confirm = await _confirm('Check Out',
         'Mark vehicle ${booking.vehicleNumber} as checked out (completed)?',
@@ -280,7 +292,13 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
                       children: [
                         // Booking status banner
                         _StatusBanner(status: booking.status),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+
+                        // QR Scan Location Validation Banner
+                        _LocationValidationBanner(
+                          validation: admin.validateBookingLocation(booking),
+                        ),
+                        const SizedBox(height: 12),
 
                         // Customer details
                         _Section(
@@ -521,6 +539,7 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
                 // Action bar
                 _ActionBar(
                   booking: booking,
+                  isQrValid: admin.isQrValid(booking),
                   onCheckIn: () => _checkIn(admin),
                   onCheckOut: () => _checkOut(admin),
                   onAcceptRefund: () => _acceptRefund(admin),
@@ -538,6 +557,87 @@ class _AdminBookingDetailScreenState extends State<AdminBookingDetailScreen> {
 // ---------------------------------------------------------------------------
 // Sub-widgets
 // ---------------------------------------------------------------------------
+
+class _LocationValidationBanner extends StatelessWidget {
+  final Map<String, dynamic> validation;
+
+  const _LocationValidationBanner({required this.validation});
+
+  @override
+  Widget build(BuildContext context) {
+    final isValid = validation['isValid'] == true;
+    final title = validation['statusText'] as String? ?? (isValid ? 'QR Valid' : 'QR Not Valid');
+    final message = validation['message'] as String? ?? '';
+    final color = isValid ? AppColors.success : AppColors.error;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isValid ? Icons.check_rounded : Icons.block_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isValid ? 'MATCHED' : 'LOCATION MISMATCH',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 9,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: TextStyle(
+              color: isValid ? AppColors.textPrimary : AppColors.error,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _StatusBanner extends StatelessWidget {
   final String status;
@@ -738,6 +838,7 @@ class _StatusChip extends StatelessWidget {
 
 class _ActionBar extends StatelessWidget {
   final Booking booking;
+  final bool isQrValid;
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
   final VoidCallback onAcceptRefund;
@@ -745,6 +846,7 @@ class _ActionBar extends StatelessWidget {
 
   const _ActionBar({
     required this.booking,
+    required this.isQrValid,
     required this.onCheckIn,
     required this.onCheckOut,
     required this.onAcceptRefund,
@@ -758,6 +860,41 @@ class _ActionBar extends StatelessWidget {
     final canCheckIn = status == 'confirmed' || status == 'pending';
     final canCheckOut = status == 'checked_in';
     final isDone = status == 'completed' || status == 'cancelled';
+
+    if (!isQrValid && !isDone && !isRefundRequested) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        decoration: const BoxDecoration(
+          color: AppColors.bgCard,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.error.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.error.withOpacity(0.4)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.block_rounded, color: AppColors.error, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'QR Not Valid — Check-In & Check-Out BLOCKED (Location Mismatch)',
+                  style: TextStyle(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (isRefundRequested) {
       return Container(

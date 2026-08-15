@@ -56,7 +56,10 @@ class _AdminShellState extends State<AdminShell> {
       const AdminRevenueScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdminProvider>().loadDashboardStats();
+      final authProfile = context.read<AuthProvider>().profile;
+      final adminProv = context.read<AdminProvider>();
+      adminProv.setAdminContext(authProfile);
+      adminProv.loadDashboardStats();
     });
   }
 
@@ -122,46 +125,67 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   Widget _buildSidebar() {
-    return Container(
-      width: 200,
-      color: AppColors.bgCard,
-      child: Column(
-        children: [
-          // Admin header
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(10),
+    return Consumer<AdminProvider>(
+      builder: (context, admin, _) => Container(
+        width: 200,
+        color: AppColors.bgCard,
+        child: Column(
+          children: [
+            // Admin header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.admin_panel_settings_rounded,
+                        color: Colors.white, size: 22),
                   ),
-                  child: const Icon(Icons.admin_panel_settings_rounded,
-                      color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Admin',
-                          style: TextStyle(
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          admin.adminProfile?.fullName ?? 'Admin',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.w800,
-                              fontSize: 15)),
-                      Text('ParkSafe Staff',
-                          style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 11)),
-                    ],
+                              fontSize: 13),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_rounded,
+                                size: 10, color: AppColors.accent),
+                            const SizedBox(width: 2),
+                            Expanded(
+                              child: Text(
+                                admin.assignedLocationName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: AppColors.accent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1, color: AppColors.border),
+            const Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 8),
           ..._navItems.asMap().entries.map((entry) {
             final i = entry.key;
@@ -186,7 +210,7 @@ class _AdminShellState extends State<AdminShell> {
           const SizedBox(height: 16),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildBottomNav() {

@@ -59,21 +59,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               color: Colors.white, size: 24),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Admin Dashboard',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary,
-                                    letterSpacing: -0.4,
-                                  )),
-                              Text('ParkSafe Control Panel',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 11)),
+                              Text(
+                                '${admin.assignedLocationName} Admin',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on_rounded,
+                                      size: 11, color: AppColors.accent),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    admin.assignedLocationName,
+                                    style: const TextStyle(
+                                        color: AppColors.accent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),

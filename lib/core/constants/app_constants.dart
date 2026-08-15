@@ -6,6 +6,7 @@ class AppConstants {
 
   // Tables
   static const String tableProfiles = 'profiles';
+  static const String tableAdminAccounts = 'admin_accounts';
   static const String tableParkingLocations = 'parking_locations';
   static const String tableParkingSlots = 'parking_slots';
   static const String tableBookings = 'bookings';

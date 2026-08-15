@@ -23,6 +23,23 @@ class AuthRepository {
     }
   }
 
+  Future<UserProfile?> getAdminAccountByPhone(String phone) async {
+    try {
+      final cleanPhone = phone.trim();
+      final List res = await _client
+          .from(AppConstants.tableAdminAccounts)
+          .select()
+          .eq('phone', cleanPhone)
+          .limit(1);
+      if (res.isNotEmpty) {
+        return UserProfile.fromJson(res.first as Map<String, dynamic>);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
 
 
   Future<UserProfile> customSignUp({

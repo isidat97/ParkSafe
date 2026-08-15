@@ -18,7 +18,7 @@ class AdminRepository {
   // Booking Queries
   // ---------------------------------------------------------------------------
 
-  Future<List<Booking>> getAllBookings() async {
+  Future<List<Booking>> getAllBookings({String? assignedLocationId}) async {
     final data = await _client
         .from(AppConstants.tableBookings)
         .select('''
@@ -29,12 +29,22 @@ class AdminRepository {
           )
         ''')
         .order('created_at', ascending: false);
-    return (data as List)
+    var list = (data as List)
         .map((e) => Booking.fromJson(e as Map<String, dynamic>))
         .toList();
+    if (assignedLocationId != null &&
+        assignedLocationId.isNotEmpty &&
+        assignedLocationId != 'ALL') {
+      list = list
+          .where((b) =>
+              b.slot?.locationId == assignedLocationId ||
+              b.location?.id == assignedLocationId)
+          .toList();
+    }
+    return list;
   }
 
-  Future<List<Booking>> getTodaysBookings() async {
+  Future<List<Booking>> getTodaysBookings({String? assignedLocationId}) async {
     final today = _todayStr();
     final data = await _client
         .from(AppConstants.tableBookings)
@@ -47,9 +57,19 @@ class AdminRepository {
         ''')
         .eq('booking_date', today)
         .order('created_at', ascending: false);
-    return (data as List)
+    var list = (data as List)
         .map((e) => Booking.fromJson(e as Map<String, dynamic>))
         .toList();
+    if (assignedLocationId != null &&
+        assignedLocationId.isNotEmpty &&
+        assignedLocationId != 'ALL') {
+      list = list
+          .where((b) =>
+              b.slot?.locationId == assignedLocationId ||
+              b.location?.id == assignedLocationId)
+          .toList();
+    }
+    return list;
   }
 
   Future<Map<String, dynamic>?> getBookingWithUserByQr(String qrData) async {
@@ -302,7 +322,7 @@ class AdminRepository {
   // Parking Slots
   // ---------------------------------------------------------------------------
 
-  Future<List<Map<String, dynamic>>> getAllSlotsWithLocation() async {
+  Future<List<Map<String, dynamic>>> getAllSlotsWithLocation({String? assignedLocationId}) async {
     final data = await _client
         .from(AppConstants.tableParkingSlots)
         .select('''
@@ -310,7 +330,15 @@ class AdminRepository {
           parking_locations(id, name, address)
         ''')
         .order('slot_number');
-    return (data as List).cast<Map<String, dynamic>>();
+    var list = (data as List).cast<Map<String, dynamic>>();
+    if (assignedLocationId != null &&
+        assignedLocationId.isNotEmpty &&
+        assignedLocationId != 'ALL') {
+      list = list
+          .where((s) => s['location_id'] == assignedLocationId)
+          .toList();
+    }
+    return list;
   }
 
   Future<bool> updateSlotFloor(String slotId, String floorName) async {
@@ -376,16 +404,28 @@ class AdminRepository {
   // Revenue & Dashboard Stats
   // ---------------------------------------------------------------------------
 
-  Future<Map<String, dynamic>> getDashboardStats() async {
+  Future<Map<String, dynamic>> getDashboardStats({String? assignedLocationId}) async {
     final today = _todayStr();
 
     // Today's bookings count
     final todayBookings = await _client
         .from(AppConstants.tableBookings)
-        .select('id, total_amount, status')
+        .select('''
+          id, total_amount, status,
+          parking_slots(location_id)
+        ''')
         .eq('booking_date', today);
 
-    final todayList = (todayBookings as List).cast<Map<String, dynamic>>();
+    var todayList = (todayBookings as List).cast<Map<String, dynamic>>();
+    if (assignedLocationId != null &&
+        assignedLocationId.isNotEmpty &&
+        assignedLocationId != 'ALL') {
+      todayList = todayList.where((b) {
+        final ps = b['parking_slots'] as Map<String, dynamic>?;
+        return ps != null && ps['location_id'] == assignedLocationId;
+      }).toList();
+    }
+
     final todayCount = todayList.length;
     final revenueToday = todayList
         .where((b) => b['status'] != 'cancelled')
@@ -399,8 +439,20 @@ class AdminRepository {
     // All-time revenue
     final allBookings = await _client
         .from(AppConstants.tableBookings)
-        .select('total_amount, status');
-    final allList = (allBookings as List).cast<Map<String, dynamic>>();
+        .select('''
+          total_amount, status,
+          parking_slots(location_id)
+        ''');
+    var allList = (allBookings as List).cast<Map<String, dynamic>>();
+    if (assignedLocationId != null &&
+        assignedLocationId.isNotEmpty &&
+        assignedLocationId != 'ALL') {
+      allList = allList.where((b) {
+        final ps = b['parking_slots'] as Map<String, dynamic>?;
+        return ps != null && ps['location_id'] == assignedLocationId;
+      }).toList();
+    }
+
     final totalRevenue = allList
         .where((b) => b['status'] != 'cancelled')
         .fold<double>(
@@ -409,15 +461,22 @@ class AdminRepository {
     // Total slots
     final slotsData = await _client
         .from(AppConstants.tableParkingSlots)
-        .select('id, is_active');
-    final totalSlots = (slotsData as List).length;
+        .select('id, is_active, location_id');
+    var slotsList = (slotsData as List).cast<Map<String, dynamic>>();
+    if (assignedLocationId != null &&
+        assignedLocationId.isNotEmpty &&
+        assignedLocationId != 'ALL') {
+      slotsList = slotsList
+          .where((s) => s['location_id'] == assignedLocationId)
+          .toList();
+    }
 
     return {
       'today_count': todayCount,
       'revenue_today': revenueToday,
       'checked_in_count': checkedInCount,
       'total_revenue': totalRevenue,
-      'total_slots': totalSlots,
+      'total_slots': slotsList.length,
     };
   }
 
@@ -453,13 +512,24 @@ class AdminRepository {
   // Vehicles (derived from bookings)
   // ---------------------------------------------------------------------------
 
-  Future<List<Map<String, dynamic>>> getAllVehicles() async {
+  Future<List<Map<String, dynamic>>> getAllVehicles({String? assignedLocationId}) async {
     final data = await _client
         .from(AppConstants.tableBookings)
-        .select('vehicle_number, booking_date, created_at')
+        .select('''
+          vehicle_number, booking_date, created_at,
+          parking_slots(location_id)
+        ''')
         .order('created_at', ascending: false);
 
-    final raw = (data as List).cast<Map<String, dynamic>>();
+    var raw = (data as List).cast<Map<String, dynamic>>();
+    if (assignedLocationId != null &&
+        assignedLocationId.isNotEmpty &&
+        assignedLocationId != 'ALL') {
+      raw = raw.where((b) {
+        final ps = b['parking_slots'] as Map<String, dynamic>?;
+        return ps != null && ps['location_id'] == assignedLocationId;
+      }).toList();
+    }
 
     // Group by vehicle_number
     final Map<String, Map<String, dynamic>> vehicles = {};

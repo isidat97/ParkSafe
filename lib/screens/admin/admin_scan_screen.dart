@@ -111,7 +111,23 @@ class _AdminScanScreenState extends State<AdminScanScreen>
 
     if (!mounted) return;
 
-    if (success) {
+    if (success && admin.scannedBooking != null) {
+      final validation = admin.validateBookingLocation(admin.scannedBooking!);
+      final isValid = validation['isValid'] == true;
+
+      if (!isValid) {
+        final bookingLoc = validation['bookingLocation'] ?? 'another location';
+        final adminLoc = validation['adminLocation'] ?? 'your location';
+        await _showInvalidQrDialog(
+          'QR Code Not Valid\n\n'
+          'This booking does not belong to your assigned parking location.\n\n'
+          '• Customer Booking: $bookingLoc\n'
+          '• Your Location: $adminLoc',
+        );
+        _resetScan();
+        return;
+      }
+
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -135,6 +151,53 @@ class _AdminScanScreenState extends State<AdminScanScreen>
     }
   }
 
+  Future<void> _showInvalidQrDialog(String message) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.block_rounded, color: AppColors.error, size: 26),
+            SizedBox(width: 10),
+            Text(
+              'QR Code Not Valid',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showError(String msg) {
     if (!mounted) return;
     // Clear any existing queued SnackBars first so notifications NEVER stack up!
@@ -144,12 +207,11 @@ class _AdminScanScreenState extends State<AdminScanScreen>
         content: Text(msg),
         backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
-
 
   Future<void> _manualLookup() async {
     final input = _manualCtrl.text.trim();
@@ -169,6 +231,22 @@ class _AdminScanScreenState extends State<AdminScanScreen>
 
     if (!mounted) return;
     if (success && admin.scannedBooking != null) {
+      final validation = admin.validateBookingLocation(admin.scannedBooking!);
+      final isValid = validation['isValid'] == true;
+
+      if (!isValid) {
+        final bookingLoc = validation['bookingLocation'] ?? 'another location';
+        final adminLoc = validation['adminLocation'] ?? 'your location';
+        await _showInvalidQrDialog(
+          'QR Code Not Valid\n\n'
+          'This booking does not belong to your assigned parking location.\n\n'
+          '• Customer Booking: $bookingLoc\n'
+          '• Your Location: $adminLoc',
+        );
+        _resetScan();
+        return;
+      }
+
       await Navigator.push(
         context,
         MaterialPageRoute(

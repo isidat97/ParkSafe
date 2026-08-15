@@ -12,6 +12,10 @@ class AdminProvider extends ChangeNotifier {
   // State
   // ---------------------------------------------------------------------------
 
+  // Admin Profile & Location Access Context
+  UserProfile? _adminProfile;
+  String? _assignedLocationName;
+
   bool _isLoading = false;
   String? _error;
 
@@ -44,11 +48,23 @@ class AdminProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _revenueByDate = [];
 
   // ---------------------------------------------------------------------------
-  // Getters
+  // Getters & Context Initialization
   // ---------------------------------------------------------------------------
 
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  UserProfile? get adminProfile => _adminProfile;
+  String? get assignedLocationId => _adminProfile?.assignedLocationId;
+  String get assignedLocationName =>
+      _assignedLocationName ?? _resolveDefaultLocationName(_adminProfile);
+
+  bool get isSuperAdmin =>
+      _adminProfile?.role == 'super_admin' ||
+      (_adminProfile?.role == 'admin' &&
+          (_adminProfile?.assignedLocationId == null ||
+              _adminProfile?.assignedLocationId == 'ALL' ||
+              _adminProfile?.assignedLocationId == ''));
 
   Map<String, dynamic> get dashboardStats => _dashboardStats;
 
@@ -71,6 +87,86 @@ class AdminProvider extends ChangeNotifier {
 
   List<Map<String, dynamic>> get revenueByDate => _revenueByDate;
 
+  void setAdminContext(UserProfile? profile) {
+    _adminProfile = profile;
+    _assignedLocationName = _resolveDefaultLocationName(profile);
+    notifyListeners();
+  }
+
+  String _resolveDefaultLocationName(UserProfile? profile) {
+    if (profile == null) return 'Main Admin (All Locations)';
+    final locId = profile.assignedLocationId;
+    if (locId == 'b0000000-0000-0000-0000-000000000034') return 'Surat VR Mall';
+    if (locId == 'b0000000-0000-0000-0000-000000000009') return 'Mumbai Airport';
+    if (locId == 'b0000000-0000-0000-0000-000000000051') return 'Surat RR Mall';
+
+    if (profile.fullName != null && profile.fullName!.isNotEmpty) {
+      if (profile.fullName!.contains('Admin')) {
+        return profile.fullName!.replaceAll('Admin', '').trim();
+      }
+      return profile.fullName!;
+    }
+
+    if (profile.role == 'super_admin' || locId == null || locId.isEmpty) {
+      return 'All Parking Locations';
+    }
+    return 'Assigned Location';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Location Access Control & QR Validation Rules
+  // ---------------------------------------------------------------------------
+
+  /// Verifies whether the logged-in Admin is authorized to scan/check-in/check-out this booking.
+  /// Rule: Admin Location == Booking Location OR Main Admin.
+  bool isQrValid(Booking booking) {
+    if (isSuperAdmin) return true;
+    final adminLocId = assignedLocationId;
+    if (adminLocId == null || adminLocId.isEmpty || adminLocId == 'ALL') {
+      return true;
+    }
+
+    final bookingLocId = booking.slot?.locationId ?? booking.location?.id;
+    if (bookingLocId != null && bookingLocId.isNotEmpty) {
+      return bookingLocId == adminLocId;
+    }
+
+    // Fallback name matching if IDs are missing or unpopulated
+    final adminName = assignedLocationName.toLowerCase().replaceAll('admin', '').trim();
+    final bookingName = (booking.location?.name ?? '').toLowerCase().trim();
+
+    if (adminName.isNotEmpty && bookingName.isNotEmpty) {
+      return bookingName.contains(adminName) || adminName.contains(bookingName);
+    }
+    return false;
+  }
+
+  Map<String, dynamic> validateBookingLocation(Booking booking) {
+    final isValid = isQrValid(booking);
+    final bookingLocName = booking.location?.name ?? 'Unknown Location';
+    final adminLocName = assignedLocationName;
+
+    if (isValid) {
+      return {
+        'isValid': true,
+        'statusText': 'QR Valid',
+        'message':
+            'Customer QR booking location ($bookingLocName) matches logged-in admin assigned location.',
+        'bookingLocation': bookingLocName,
+        'adminLocation': adminLocName,
+      };
+    } else {
+      return {
+        'isValid': false,
+        'statusText': 'QR Not Valid',
+        'message':
+            'QR Not Valid: Customer booking is for "$bookingLocName", but you are logged in as "$adminLocName" Admin. Check-In and Check-Out are blocked.',
+        'bookingLocation': bookingLocName,
+        'adminLocation': adminLocName,
+      };
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Dashboard
   // ---------------------------------------------------------------------------
@@ -80,7 +176,7 @@ class AdminProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _dashboardStats = await _repo.getDashboardStats();
+      _dashboardStats = await _repo.getDashboardStats(assignedLocationId: assignedLocationId);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -98,7 +194,7 @@ class AdminProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _allBookings = await _repo.getAllBookings();
+      _allBookings = await _repo.getAllBookings(assignedLocationId: assignedLocationId);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -112,7 +208,7 @@ class AdminProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _todaysBookings = await _repo.getTodaysBookings();
+      _todaysBookings = await _repo.getTodaysBookings(assignedLocationId: assignedLocationId);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -250,6 +346,16 @@ class AdminProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<Map<String, dynamic>> checkIn(String bookingId) async {
+    if (_scannedBooking != null && _scannedBooking!.id == bookingId) {
+      if (!isQrValid(_scannedBooking!)) {
+        final val = validateBookingLocation(_scannedBooking!);
+        return {
+          'success': false,
+          'message': val['message'],
+          'qrInvalid': true,
+        };
+      }
+    }
     final result = await _repo.checkIn(bookingId);
     if (result['success'] == true) {
       // Update local state
@@ -262,6 +368,13 @@ class AdminProvider extends ChangeNotifier {
   }
 
   Future<bool> checkOut(String bookingId) async {
+    if (_scannedBooking != null && _scannedBooking!.id == bookingId) {
+      if (!isQrValid(_scannedBooking!)) {
+        _scanError = 'QR Not Valid: Location mismatch. Check-Out blocked.';
+        notifyListeners();
+        return false;
+      }
+    }
     final success = await _repo.checkOut(bookingId);
     if (success) {
       final now = DateTime.now();
@@ -378,7 +491,7 @@ class AdminProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _vehicles = await _repo.getAllVehicles();
+      _vehicles = await _repo.getAllVehicles(assignedLocationId: assignedLocationId);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -396,7 +509,7 @@ class AdminProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _slotsWithLocation = await _repo.getAllSlotsWithLocation();
+      _slotsWithLocation = await _repo.getAllSlotsWithLocation(assignedLocationId: assignedLocationId);
       _locations = await _repo.getAllLocations();
     } catch (e) {
       _error = e.toString();

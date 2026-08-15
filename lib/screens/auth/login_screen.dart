@@ -33,21 +33,50 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     auth.clearError();
 
-    // Admin Credentials Check: Mobile Number: 9999988888 / Password: 123456
-    if ((phone == '9999988888' || phone == '999998888') && pass == '123456') {
-      await auth.signInAdmin();
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/admin');
+    // Check pre-configured Admin Accounts
+    if (pass == '123456') {
+      if (phone == '9999988888' || phone == '999998888') {
+        await auth.signInAdmin(phone: '9999988888');
+        if (mounted) Navigator.pushReplacementNamed(context, '/admin');
+        return;
+      } else if (phone == '9999911111') {
+        await auth.signInAdmin(
+          phone: '9999911111',
+          assignedLocationId: 'b0000000-0000-0000-0000-000000000034',
+          fullName: 'Surat VR Mall Admin',
+        );
+        if (mounted) Navigator.pushReplacementNamed(context, '/admin');
+        return;
+      } else if (phone == '9999922222') {
+        await auth.signInAdmin(
+          phone: '9999922222',
+          assignedLocationId: 'b0000000-0000-0000-0000-000000000009',
+          fullName: 'Mumbai Airport Admin',
+        );
+        if (mounted) Navigator.pushReplacementNamed(context, '/admin');
+        return;
+      } else if (phone == '9999933333') {
+        await auth.signInAdmin(
+          phone: '9999933333',
+          assignedLocationId: 'b0000000-0000-0000-0000-000000000051',
+          fullName: 'Surat RR Mall Admin',
+        );
+        if (mounted) Navigator.pushReplacementNamed(context, '/admin');
+        return;
       }
-      return;
     }
 
     final success = await auth.signIn(
       phone: phone,
       password: pass,
     );
+
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/location-select');
+      if (auth.isAdmin) {
+        Navigator.pushReplacementNamed(context, '/admin');
+      } else {
+        Navigator.pushReplacementNamed(context, '/location-select');
+      }
     }
   }
 
@@ -249,7 +278,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           onTap: _login,
                         ),
                       ),
+                      const SizedBox(height: 20),
+
                       const SizedBox(height: 24),
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -286,3 +318,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
